@@ -3,27 +3,30 @@
 #include <glad/glad.h>
 
 
+#include "triangles.hpp"
+
 int main(int argc, const char * argv[]) {
 	std::cout << "Hello World!" << std::endl;
 
 
 	Window window(800, 600, "Hello World!");
 
-	window.MakeCurrentContext();
+	MakeCurrentContext(window);
 
-	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(&Window::GetAnyProcAddress))) {
+	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(&GetAnyProcAddress))) {
 		std::cout << "Failed to load GLAD!" << std::endl;
 	}
 
-	glViewport(0,0,800,600);
 
-	while(!window.ShouldClose()) {
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+	init();
 
+	while(!ShouldClose(window)) {
 
-		window.SwapBuffers();
-		
+		glViewport(0,0,window.width,window.height);
+
+		display();
+
+		SwapBuffers(window);
 	}
 
 	return 0;

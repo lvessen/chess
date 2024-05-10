@@ -26,6 +26,7 @@ std::unique_ptr<WindowImpl> createWindow(int width, int height, const char * nam
 	}
 	window_name[ind] = '\0';
 
+
 	std::unique_ptr<WindowImpl> window = std::make_unique<WindowImpl>();
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
@@ -47,13 +48,16 @@ std::unique_ptr<WindowImpl> createWindow(int width, int height, const char * nam
 
 	RegisterClassExW(&wndClass);
 
+	RECT rect {0, 0, width, height};
+	AdjustWindowRect(&rect, WS_BORDER | WS_VISIBLE |  WS_SYSMENU | WS_OVERLAPPEDWINDOW, false);
+
 	window->hwnd = CreateWindowExW(
 		WS_EX_APPWINDOW | WS_EX_OVERLAPPEDWINDOW,
 		L"className",
 		window_name,
-		WS_BORDER | WS_VISIBLE | WS_SYSMENU,
+		WS_BORDER | WS_VISIBLE | WS_SYSMENU | WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT,
-		width, height,
+		rect.right - rect.left, rect.bottom - rect.top,
 		nullptr,
 		0,
 		hInstance,
@@ -65,10 +69,11 @@ std::unique_ptr<WindowImpl> createWindow(int width, int height, const char * nam
 };
 
 Window::Window(int width, int height, const char * name) : 
-	pImpl(createWindow(width, height, name)) {
+	pImpl(createWindow(width, height, name)), width(width), height(height) {
+	SetWindowLongPtrW(pImpl->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 }
 
-void* Window::GetAnyProcAddress(const char *name) {
+void* GetAnyProcAddress(const char *name) {
   void *p = (void *)wglGetProcAddress(name);
   if(p == 0 ||
     (p == (void*)0x1) || (p == (void*)0x2) || (p == (void*)0x3) ||
@@ -81,7 +86,7 @@ void* Window::GetAnyProcAddress(const char *name) {
   return p;
 }
 
-void Window::MakeCurrentContext() {
+void MakeCurrentContext(Window& window) {
 	PIXELFORMATDESCRIPTOR pfd = {
 		sizeof(PIXELFORMATDESCRIPTOR),
 		1,
@@ -101,31 +106,31 @@ void Window::MakeCurrentContext() {
 		0, 0, 0
 	};
 
-	pImpl->hdc = GetDC(pImpl->hwnd);
+	window.pImpl->hdc = GetDC(window.pImpl->hwnd);
 
-	std::cout << "hdc: " << pImpl->hdc << std::endl; 
-	const int iPixelFormat = ChoosePixelFormat(pImpl->hdc, &pfd);
-	SetPixelFormat(pImpl->hdc, iPixelFormat, &pfd);
+	std::cout << "hdc: " << window.pImpl->hdc << std::endl; 
+	const int iPixelFormat = ChoosePixelFormat(window.pImpl->hdc, &pfd);
+	SetPixelFormat(window.pImpl->hdc, iPixelFormat, &pfd);
 
-	pImpl->hglrc = wglCreateContext(pImpl->hdc);
-	std::cout << "hglrc: " << pImpl->hglrc << std::endl; 
+	window.pImpl->hglrc = wglCreateContext(window.pImpl->hdc);
+	std::cout << "hglrc: " << window.pImpl->hglrc << std::endl; 
 
-	wglMakeCurrent(pImpl->hdc, pImpl->hglrc);
+	wglMakeCurrent(window.pImpl->hdc, window.pImpl->hglrc);
 }
 
-void Window::SwapBuffers() {
-	::SwapBuffers(pImpl->hdc);
+void SwapBuffers(Window& window) {
+	::SwapBuffers(window.pImpl->hdc);
 }
 
-bool Window::ShouldClose() {
+bool ShouldClose(Window& window) {
 
-	BOOL result = GetMessage(&(pImpl->msg), pImpl->hwnd, NULL, NULL);
+	BOOL result = GetMessage(&(window.pImpl->msg), window.pImpl->hwnd, NULL, NULL);
 
 	if (result == -1) {
 		return true;
 	} else {
-		TranslateMessage(&(pImpl->msg));
-		DispatchMessage(&(pImpl->msg));
+		TranslateMessage(&(window.pImpl->msg));
+		DispatchMessage(&(window.pImpl->msg));
 	}
 
 	return result == 0;
@@ -137,6 +142,15 @@ Window::~Window() {
 	}
 }
 
-LRESULT CALLBACK wndProc(HWND unnamedParam1, UINT unnamedParam2, WPARAM wParam, LPARAM lParam) { 
-	return DefWindowProcW(unnamedParam1, unnamedParam2, wParam, lParam);
+LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) { 
+
+	Window * window = reinterpret_cast<Window*>(::GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+	if (window) {
+		if (msg == WM_SIZE) {
+			window->width = LOWORD(lParam); 
+			window->height = HIWORD(lParam); 
+		}
+	}
+	return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
