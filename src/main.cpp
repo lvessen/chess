@@ -2,8 +2,7 @@
 #include "window.h"
 #include <glad/glad.h>
 
-
-#include "triangles.hpp"
+#include "chessboard.hpp"
 
 int main(int argc, const char * argv[]) {
 	std::cout << "Hello World!" << std::endl;

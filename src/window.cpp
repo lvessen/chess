@@ -64,6 +64,7 @@ std::unique_ptr<WindowImpl> createWindow(int width, int height, const char * nam
 		nullptr);
 
 	ShowWindow(window->hwnd, SW_SHOW);
+	UpdateWindow(window->hwnd);
 
 	return window;
 };
@@ -124,21 +125,27 @@ void SwapBuffers(Window& window) {
 
 bool ShouldClose(Window& window) {
 
-	BOOL result = GetMessage(&(window.pImpl->msg), window.pImpl->hwnd, NULL, NULL);
+	BOOL result = false;
 
-	if (result == -1) {
-		return true;
-	} else {
-		TranslateMessage(&(window.pImpl->msg));
-		DispatchMessage(&(window.pImpl->msg));
+	while (PeekMessage(&(window.pImpl->msg), window.pImpl->hwnd, NULL, NULL, PM_NOREMOVE) == TRUE) {
+		if ((result = GetMessage(&(window.pImpl->msg), NULL, 0, 0)) != 0) {
+			TranslateMessage(&(window.pImpl->msg));
+			DispatchMessage(&(window.pImpl->msg));
+		} else {
+			return true;
+		}
 	}
 
-	return result == 0;
+	return result == -1;
 }
 
 Window::~Window() {
 	if (pImpl != nullptr) {
 		wglDeleteContext(pImpl->hglrc);
+	}
+
+	if (pImpl->hwnd != NULL) {
+		DestroyWindow(pImpl->hwnd);
 	}
 }
 
